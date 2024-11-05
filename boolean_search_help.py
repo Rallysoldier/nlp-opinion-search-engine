@@ -3,7 +3,7 @@ import argparse
 import pickle
 
 # Load postings list
-with open("postings_list.pkl", "rb") as f:
+with open("posting_list.pkl", "rb") as f:
     postings_list = pickle.load(f)
 
 def get_indices(term):

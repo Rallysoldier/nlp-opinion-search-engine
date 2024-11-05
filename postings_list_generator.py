@@ -29,10 +29,10 @@ def main():
     postings_list = create_postings_list(reviews_segment_df)
     
     # Save the postings list to a file
-    with open("postings_list.pkl", "wb") as f:
+    with open("posting_list.pkl", "wb") as f:
         pickle.dump(postings_list, f)
     
-    print("Postings list created and saved as 'postings_list.pkl'")
+    print("Postings list created and saved as 'posting_list.pkl'")
     
 if __name__ == "__main__":
     main()

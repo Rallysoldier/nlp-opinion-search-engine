@@ -2,6 +2,8 @@ import pandas as pd
 import argparse
 import random
 
+'''CURRENTLY NONFUNCTIONAL'''
+
 def _sample_reviews(reviews_df, review_indices, max_sample_size=5):
     """Display a random sample of reviews based on provided indices."""
     if max_sample_size > 0:

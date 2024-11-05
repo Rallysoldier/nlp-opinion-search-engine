@@ -58,7 +58,7 @@ def compare_set_vs_list(filename, search_term):
 def result_vs_homogenous_search(result_filename, posting_filename, search_term):
     '''For ensuring consistency between postings list # of indices and binary search results
     Ensure that prior commands to boolean_search_help.py are homogenous. e.g.
-    python boolean_search_help.py --aspect 1 gps --aspect2 gps --opinion gps --method (any)'''
+    python boolean_search_help.py --aspect1 gps --aspect2 gps --opinion gps --method method'''
     with open(result_filename, "rb") as f:
         result_indices = pickle.load(f)
     with open(posting_filename, "rb") as f:

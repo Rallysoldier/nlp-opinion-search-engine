@@ -2,11 +2,12 @@ import pandas as pd
 import argparse
 import random
 
-def _sample_reviews(max_sample_size, reviews_df, review_indices, matching_reviews):
+def _sample_reviews(reviews_df, review_indices, max_sample_size=5):
+    """Display a random sample of reviews based on provided indices."""
     if max_sample_size > 0:
-        sample_size = min(max_sample_size, len(matching_reviews))  # Limit sample size to 5 reviews
+        sample_size = min(max_sample_size, len(review_indices))  # Limit sample size
         sample_indices = random.sample(review_indices, sample_size)
-    
+        
         print("\nSample reviews:")
         for index in sample_indices:
             print(f"\nReview at index {index}:")
@@ -16,60 +17,44 @@ def _sample_reviews(max_sample_size, reviews_df, review_indices, matching_review
         return
 
 def main():
-
     parser = argparse.ArgumentParser(description="Check results against corpus")
 
-    parser.add_argument("-a1", "--aspect1", type=str, required=True, help="First word of the aspect")
-    parser.add_argument("-a2", "--aspect2", type=str, required=True, help="Second word of the aspect")
-    parser.add_argument("-o", "--opinion", type=str, required=True, help="Opinion word or phrase")
-    parser.add_argument("-m", "--method", type=str, required=True, default=None, help="The method of the resulting boolean search file. Methods\
-                        can be method1, method2 or method3")
+    parser.add_argument("-f", "--file", type=str, required=True, help="The boolean search result pickle file to check")
+    parser.add_argument("-t", "--terms", nargs="*", help="List of terms to check occurrences in matching reviews")
+    parser.add_argument("-s", "--sample_size", type=int, default=5, help="Number of random reviews to sample for display")
     
     # Parse the arguments
     args = parser.parse_args()
 
-    # Define the filename based on method
-    result_filename = f"{args.aspect1}_{args.aspect2}_{args.opinion}_{args.method}.pkl"
-
     # Load the result file into result_df
     try:
-        # Load the indices from the results file
-        result_df = pd.read_pickle(result_filename)
+        result_df = pd.read_pickle(args.file)
     except FileNotFoundError:
-        print(f"\n!! Results file '{result_filename}' not found !!\n")
+        print(f"\n!! Results file '{args.file}' not found !!\n")
         return
-    
+
     # Extract the list of review indices from the result file
     review_indices = result_df["review_index"].tolist()
 
     # Load the reviews data
     reviews_df = pd.read_pickle("reviews_segment.pkl")
 
-     # Filter the reviews DataFrame to include only the relevant rows
+    # Filter the reviews DataFrame to include only the relevant rows
     matching_reviews = reviews_df.loc[review_indices]
 
-     # Summary Statistics
-    aspect1_count = matching_reviews['review_text'].str.contains(args.aspect1, case=False).sum()
-    aspect2_count = matching_reviews['review_text'].str.contains(args.aspect2, case=False).sum()
-    opinion_count = matching_reviews['review_text'].str.contains(args.opinion, case=False).sum()
+    # Display summary statistics
+    print(f"\nSummary for file '{args.file}':")
+    print(f"Total reviews in corpus: {len(reviews_df)}")
+    print(f"Total reviews matched in results file: {len(matching_reviews)}")
 
-    print(f"\nSummary for '{args.aspect1} {args.aspect2}:{args.opinion}' using {args.method}:")
-    print(f"Total reviews: {len(reviews_df)}")
-    print(f"Total reviews matched: {len(matching_reviews)}")
-    print(f"Reviews containing '{args.aspect1}': {aspect1_count}")
-    print(f"Reviews containing '{args.aspect2}': {aspect2_count}")
-    print(f"Reviews containing '{args.opinion}': {opinion_count}\n")
+    # Display term-specific counts if terms are provided
+    if args.terms:
+        for term in args.terms:
+            term_count = matching_reviews['review_text'].str.contains(term, case=False).sum()
+            print(f"Reviews containing '{term}': {term_count}")
 
-    # Sample display of matching reviews for manual verification
-    max_sample_size = 0
-    _sample_reviews(max_sample_size, reviews_df, review_indices, matching_reviews)
+    # Display sample reviews for manual verification
+    _sample_reviews(reviews_df, review_indices, args.sample_size)
 
 if __name__ == "__main__":
     main()
-
-'''
-TERMINAL:
- python bs_checker.py --aspect1 audio --aspect2 quality --opinion poor --method method1
- python bs_checker.py --aspect1 audio --aspect2 quality --opinion poor --method method2
- python bs_checker.py --aspect1 audio --aspect2 quality --opinion poor --method method3
-'''

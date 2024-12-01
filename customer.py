@@ -1,22 +1,25 @@
 import pickle
 import pandas as pd
-from io import StringIO
 import ast
-import csv
+import re
 
 ''' Customer Class and Methods for M4: Unique Method '''
 class Customer:
     def __init__(
-            self, group, cust_id, metadata:list[str]=None, formatted_metadata:list[tuple]=None, 
-            tuple_sizes:int=None, reviews:list[str]=None, num_reviews:int=0, 
+            self, group, cust_id, positive_words=None, negative_words=None, 
+            metadata:list[str]=None, formatted_metadata:list[tuple]=None, 
+            tuple_sizes:int=None, reviews:list[dict]=None, num_reviews:int=0, 
             star_sum:int=0, helpful_count:int=0, out_of_helpful_count:int=0, 
             avg_stars:float=None, avg_helpfulness:float=None, avg_positivity:float=None
             ):
         self.group = group
         self.cust_id = cust_id
+        self.positive_words = positive_words if positive_words is not None else None
+        self.negative_words = negative_words if negative_words is not None else None
         self.metadata = self.get_metadata()
         self.formatted_metadata = self.format_metadata()
         self.tuple_sizes = self.get_tuple_sizes()
+        self.reviews = []
         self.helpful_count = 0
         self.out_of_helpful_count = 0
         self.star_sum = 0
@@ -24,7 +27,10 @@ class Customer:
         self.extract_metadata()
         self.avg_stars = self.calc_avg_stars()
         self.avg_helpfulness = self.calc_avg_helpfulness()
-        self.avg_positivity = self.calc_avg_positivity()
+        if positive_words and negative_words:
+            self.avg_positivity = self.calc_avg_positivity()
+        else:
+            self.avg_positivity = None
 
     def get_metadata(self):
         metadata:list[str] = []
@@ -84,7 +90,11 @@ class Customer:
         }
         # Populate class member variables from tuple
         for field in self.formatted_metadata:
-            #print(f"Formatted Field: {field} Type: {type(field)} Size: {len(field)}\n")
+            self.reviews.append({
+                index[0]: field[0], 
+                index[2]: field[2],
+                index[10]: field[10]
+            })
             self.helpful_count += int(field[3])
             self.out_of_helpful_count += int(field[4])
             self.star_sum += int(field[5])
@@ -100,7 +110,21 @@ class Customer:
             return self.helpful_count / self.out_of_helpful_count 
 
     def calc_avg_positivity(self):
-        pass
+        positive_sum = 0
+        negative_sum = 0
+        for review in self.reviews:
+            review_text = review["review_text"]
+            # Tokenize and Count
+            words = re.findall(r'\b\w+\b', review_text.lower())
+            positive_count = sum(1 for word in words if word in self.positive_words)
+            negative_count = sum(1 for word in words if word in self.negative_words)
+            positive_sum += positive_count
+            negative_sum += negative_count
+        total_sum = positive_sum + negative_sum
+        if total_sum > 0:
+            return positive_sum / total_sum
+        else:
+            return None
 
     def diagnostic(self):
         attributes = [
@@ -114,20 +138,44 @@ class Customer:
             else:
                 print(f"{attr_name}: length={len(attr_value)}: {type(attr_value)}")
 
-def get_groups(corpus_filename="reviews_segment.pkl") -> pd.DataFrame:
+def get_groups(corpus_filename) -> pd.DataFrame:
+    ''' Split the corpus into groups based on 'customer_id' '''
     with open(corpus_filename, "rb") as f:
         reviews_segment_df = pickle.load(f)
     return reviews_segment_df.groupby("customer_id")
 
-def get_customers(grouped_reviews:pd.DataFrame) -> list[Customer]:
+def get_customers(
+        grouped_reviews:pd.DataFrame, 
+        positive_words_filename, 
+        negative_words_filename
+    ) -> list[Customer]:
+    ''' Initialize instances of class Customer to create customer profiles'''
+    # Load positive words
+    with open(positive_words_filename, "r", encoding="utf-8") as f:
+        positive_words = {line.strip() for line in f if line.strip()}
+    # Load negative words
+    with open(negative_words_filename, "r", encoding="utf-8") as f:
+        negative_words = {line.strip() for line in f if line.strip()}
+    # Generate Profiles
     customers:list[Customer] = []
     for cust_id, group in grouped_reviews:
-        customers.append(Customer(group, cust_id))
+        customers.append(Customer(group, cust_id, positive_words, negative_words))
     return customers
 
-def customer_generation() -> list[Customer]:
-    grouped_reviews = get_groups()
-    return get_customers(grouped_reviews)
+def customer_generation(
+        corpus_filename = "reviews_segment.pkl",
+        positive_words_filename = "positive-words.txt", 
+        negative_words_filename = "negative-words.txt"
+    ) -> list[Customer]:
+    ''' Master Function to generate profiles '''
+    grouped_reviews = get_groups(corpus_filename)
+    return get_customers(grouped_reviews, positive_words_filename, negative_words_filename)
+
+def save_customers_to_file(customers, filename="customers.pkl"):
+    ''' Create customers.pkl for export '''
+    with open(filename, "wb") as f:
+        pickle.dump(customers, f)
+    print(f"Customers saved to {filename}")
 
 def run_customer_diagnostic(customers:list[Customer], reviews_segment_df):
     total_customers = len(customers)
@@ -150,13 +198,28 @@ def run_customer_diagnostic(customers:list[Customer], reviews_segment_df):
     print(f"Number of Reviews: {len(reviews_segment_df)}")
     
 def main():
-    # Only line needed for execution
-    customers = customer_generation()
+    # Configure filename override
+    corpus_filename = "reviews_segment.pkl"
+    positive_words_filename = "positive-words.txt", 
+    negative_words_filename = "negative-words.txt"
 
-    # Diagnostic
+    # Choose regeneration or diagnostic
     diagnostic = False
-    if diagnostic:
-        corpus_filename = "reviews_segment.pkl"
+    if not diagnostic:
+        # Generate profiles
+        customers = customer_generation(
+            corpus_filename,
+            positive_words_filename,
+            negative_words_filename
+        )
+        # Save to pickle
+        save_customers_to_file(customers)
+    else:
+        customers = customer_generation(
+            corpus_filename,
+            positive_words_filename,
+            negative_words_filename
+        )
         with open(corpus_filename, "rb") as f:
             reviews_segment_df = pickle.load(f)
         run_customer_diagnostic(customers, reviews_segment_df)

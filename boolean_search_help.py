@@ -219,3 +219,21 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+'''
+python boolean_search_help.py --aspect1 audio --aspect2 quality --opinion poor --method method1
+python boolean_search_help.py --aspect1 audio --aspect2 quality --opinion poor --method method2
+python boolean_search_help.py --aspect1 audio --aspect2 quality --opinion poor --method method3
+
+python boolean_search_help.py --aspect1 wifi --aspect2 signal --opinion strong --method method1
+python boolean_search_help.py --aspect1 wifi --aspect2 signal --opinion strong --method method2
+python boolean_search_help.py --aspect1 wifi --aspect2 signal --opinion strong --method method3
+
+python boolean_search_help.py --aspect1 gps --aspect2 map --opinion useful --method method1
+python boolean_search_help.py --aspect1 gps --aspect2 map --opinion useful --method method2
+python boolean_search_help.py --aspect1 gps --aspect2 map --opinion useful --method method3
+
+python boolean_search_help.py --aspect1 image --aspect2 quality --opinion sharp --method method1
+python boolean_search_help.py --aspect1 image --aspect2 quality --opinion sharp --method method2
+python boolean_search_help.py --aspect1 image --aspect2 quality --opinion sharp --method method3
+'''

@@ -13,10 +13,33 @@ segment_df["ID"] = segment_df.index + 2  # Add ID column based on the index
 segment_df_result = segment_df[["ID", "review_text"]]  # Filter relevant columns
 print(segment_df_result.head())
 
+''' CHOOSE INPUT FILE: '''
+result_files = {
+    "1": "audio_quality_poor_method1.pkl",
+    "2": "audio_quality_poor_method2.pkl",
+    "3": "audio_quality_poor_method3.pkl",
 
-''' CHOOSE INPUT FILE '''
-input_pkl = "gps_map_useful_method2.pkl"
+    "4": "wifi_signal_strong_method1.pkl",
+    "5": "wifi_signal_strong_method2.pkl",
+    "6": "wifi_signal_strong_method3.pkl",
 
+    "7": "gps_map_useful_method1.pkl",
+    "8": "gps_map_useful_method2.pkl",
+    "9": "gps_map_useful_method3.pkl",
+
+    "10": "image_quality_sharp_method1.pkl",
+    "11": "image_quality_sharp_method2.pkl",
+    "12": "image_quality_sharp_method3.pkl",
+}
+valid_input:bool = None
+while(valid_input == None):
+    user_input = input("Choose a result to analyze (1-12): ")
+    if user_input in result_files:
+        valid_input = True
+        input_pkl = result_files[user_input]
+    else:
+        print("Invalid Input\n")
+        continue
 
 with open(input_pkl, "rb") as f:
     result_ids = pickle.load(f)
@@ -32,7 +55,7 @@ print(output_df.head())
 
 # Collect IDs from result_df
 IDs = result_df["review_index"].tolist()
-print(f"IDs from boolean search: {IDs}")
+print(f"# of IDs from boolean search: {len(IDs)}")
 
 # Add rows to the output DataFrame
 for i, ID in enumerate(IDs):

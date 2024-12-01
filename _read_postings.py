@@ -121,7 +121,7 @@ def main():
     output_folder = r"C:\Users\Rallysoldier\Documents\4397_COSC\res_proj_helper_files"
     output_excel = "posting_list_excel.xlsx"
     # Create an Excel of the postings_list
-    #pkl_to_excel(filename, output_folder, output_excel)
+    pkl_to_excel(filename, output_folder, output_excel)
 
 if __name__ == "__main__":
     main()

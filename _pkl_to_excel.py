@@ -56,7 +56,7 @@ def pkl_to_excel(input_pkl, output_folder):
 # Main block to run the function from the command line
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python pkl_to_excel.py <input_pkl>")
+        print("Usage: python _pkl_to_excel.py <input_pkl>")
         sys.exit(1)
 
     input_pkl = sys.argv[1]

@@ -2,6 +2,8 @@ import pandas as pd
 import argparse
 import pickle
 import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
 
 # Load postings list
 with open("posting_list.pkl", "rb") as f:
@@ -11,6 +13,14 @@ with open("posting_list.pkl", "rb") as f:
 with open("review_metadata.pkl", "rb") as f:
     review_metadata = pickle.load(f)
 
+# Load Training Model
+with open("sentiment_classifier.pkl", "rb") as f:
+    model = pickle.load(f)
+
+# Load tfidf 
+with open("tfidf_vectorizer.pkl", "rb") as f:
+    tfidf = pickle.load(f)
+
 # Load positive words
 with open("positive-words.txt", "r", encoding="utf-8") as f:
     positive_words = {line.strip() for line in f if line.strip()}
@@ -19,12 +29,12 @@ with open("positive-words.txt", "r", encoding="utf-8") as f:
 with open("negative-words.txt", "r", encoding="utf-8") as f:
     negative_words = {line.strip() for line in f if line.strip()}
 
-# Initialize positive and negative indexes
+# Initialize positive/negative indexes
 positive_index = set()
 negative_index = set()
 
-# Populate negative and positive indexes
 def populate_sentiment_indexes():
+    ''' Populate positive/negative indexes '''
     for ID in review_metadata:
         rating = review_metadata[ID]['customer_review_rating']
         if int(rating) > 3:
@@ -32,8 +42,8 @@ def populate_sentiment_indexes():
         else:
             negative_index.add(ID)
 
-# Categorize the opinion using the opinion lexicon
 def determine_positivity(opinion):
+    ''' Categorize the opinion as positive or negative using the opinion lexicon '''
     if opinion in positive_words:
         return True
     elif opinion in negative_words:
@@ -42,7 +52,7 @@ def determine_positivity(opinion):
         return None
 
 def get_indices(term):
-    """Retrieve the set of indices for a term from the postings list."""
+    ''' Retrieve the set of indices for a term from the postings list. '''
     return set(postings_list.get(term, []))
 
 # Method 1: OR operation on all terms
@@ -67,8 +77,36 @@ def M1_rating_search(positivity, result):
         return list(result_index & negative_index)
     else:
         return result
+    
+def M2_classifier(result, review_metadata, positivity, tfidf, model):
+    """
+    Filters the result list using the sentiment classifier.
+    Args:
+        result (list): List of review IDs from the baseline Boolean search.
+        review_metadata (dict): Metadata dictionary with review text.
+        positivity (bool): Polarity of the query's opinion (True = positive, False = negative).
+        tfidf: Pre-trained TF-IDF vectorizer.
+        model: Pre-trained sentiment classification model.
+    Returns:
+        list: Refined list of review IDs matching the query's sentiment.
+    """
+    # Preprocess the review texts for the given IDs
+    review_texts = [review_metadata[ID]["text"] for ID in result]
 
-def M2_ratio_filter(positivity, result):
+    # Transform the texts into the TF-IDF feature space
+    vectorized_texts = tfidf.transform(review_texts)
+
+    # Predict sentiment for each review
+    sentiments = model.predict(vectorized_texts)
+
+    # Filter results based on query sentiment
+    filtered_results = [
+        ID for ID, sentiment in zip(result, sentiments)
+        if (positivity and sentiment == 1) or (not positivity and sentiment == 0)
+    ]
+    return filtered_results
+
+def M3_ratio_filter(positivity, result):
     ''' Calculate a Positive/Negative word ratio for each review, filtering matching reviews with undesireable ratios '''
     ratioed_result = []
     for ID in result:
@@ -85,7 +123,7 @@ def M2_ratio_filter(positivity, result):
         return result
 
 def get_ratioed(review_text):
-    ''' M2 helper function that calculates the positive word to negative word ratio in a single review'''
+    ''' M3 helper function that calculates the positive word to negative word ratio in a single review'''
     # Tokenize and Count
     words = re.findall(r'\b\w+\b', review_text.lower())
     positive_count = sum(1 for word in words if word in positive_words)
@@ -97,8 +135,17 @@ def get_ratioed(review_text):
         return None  # No sentiment words found
     return positive_count / total_count
 
-def combine_methods(result1, result2):
-    return list(set(result1) & set(result2))
+def combine_methods(result1, result2, result3):
+    return list(set(result1) & set(result2) & set(result3))
+
+def diagnostic(result, M1_result, M2_result, M3_result, combined_result, print_raw:bool=False):
+    if print_raw:
+        print(f"{result}\n{M1_result}\n{M2_result}\n{M3_result}\n{combined_result}\n")
+    print(f"Length of Baseline: {len(result)}")
+    print(f"Length of M1_result: {len(M1_result)}")
+    print(f"Length of M2_result: {len(M2_result)}")
+    print(f"Length of M3_result: {len(M3_result)}")
+    print(f"Length of combined result: {len(combined_result)}")
 
 def main():
 
@@ -113,7 +160,7 @@ def main():
     # Parse the arguments
     args = parser.parse_args()
 
-    # Populate positive_index and negative_index
+    # Populate positive/negative indexes
     populate_sentiment_indexes()
 
     # Bool that records the polarity of the opinion
@@ -133,29 +180,42 @@ def main():
     ''' M1: 4.2: Boolean and Rating Search '''
     M1_result = M1_rating_search(positivity, result)
 
-    ''' M2: 4.4(b): Grammar and Structure Based Relevance using Review Title and Sentence Structure '''
-    M2_result = M2_ratio_filter(positivity, result)
+    ''' M2: 4.3: Modeling Linguistic Relevance using Classification '''
+    M2_result = M2_classifier(result, review_metadata, positivity, tfidf, model)
 
-    ''' M1 + M2: AND operation on M1_result and M2_result '''
-    combined_result = combine_methods(M1_result, M2_result)
+    ''' M3: 4.4(b): Grammar and Structure Based Relevance using Review Title and Sentence Structure '''
+    M3_result = M3_ratio_filter(positivity, result)
 
-    # Choose method for final output. result for baseline.
-    final_result = result
+    ''' M1 + M3: AND operation: M1_result AND M2_result AND M3_result '''
+    combined_result = combine_methods(M1_result, M2_result, M3_result)
 
-    # Output final result to pkl if diagnostic is False
-    diagnostic = True
-    if not diagnostic:
+    ''' 
+    Choose Method for Final Output:
+    Baseline: 'result'
+    Rating Search: 'M1_result'
+    Classifier: 'M2_result'
+    Ratio Filter: 'M3_result'
+    Combined Methods: 'combined_result' 
+    '''
+    final_result = combined_result
+
+    # Skip file generation is diagnostic is None
+    skip_diagnostic = False
+    if skip_diagnostic:
         revs = pd.DataFrame()
         revs["review_index"] = final_result
         output_filename = f"{args.aspect1}_{args.aspect2}_{args.opinion}_{args.method}.pkl"
         revs.to_pickle(output_filename)
         print(f"Results saved to {output_filename}")
+    elif skip_diagnostic is not None:
+        revs = pd.DataFrame()
+        revs["review_index"] = final_result
+        output_filename = f"{args.aspect1}_{args.aspect2}_{args.opinion}_{args.method}.pkl"
+        revs.to_pickle(output_filename)
+        print(f"Results saved to {output_filename}")
+        diagnostic(result, M1_result, M2_result, M3_result, combined_result)
     else:
-        print(f"{result}\n{M1_result}\n{M2_result}\n{combined_result}\n")
-        print(f"Length of Baseline: {len(result)}")
-        print(f"Length of M1_result: {len(M1_result)}")
-        print(f"Length of M2_result: {len(M2_result)}")
-        print(f"Length of combined result: {len(combined_result)}")
+        diagnostic(result, M1_result, M2_result, M3_result, combined_result, print_raw=False)
 
 if __name__ == "__main__":
     main()
